@@ -19,7 +19,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle and Build APK
+      - name: Download Gradle and Build APK
         run: |
           set -e
 
@@ -36,19 +36,13 @@ jobs:
             echo 'if (file("app").exists()) { include(":app") }' >> settings.gradle.kts
           fi
 
-          # Install standalone Gradle 8.7 if wrapper is absent
-          if [ ! -f "./gradlew" ]; then
-            echo "==> Downloading Gradle 8.7..."
-            curl -sLO https://services.gradle.org/distributions/gradle-8.7-bin.zip
-            unzip -q gradle-8.7-bin.zip
-            ./gradle-8.7/bin/gradle wrapper
-            rm -rf gradle-8.7-bin.zip gradle-8.7
-          fi
+          # Download and unpack standalone Gradle 8.7
+          echo "==> Downloading Gradle 8.7..."
+          curl -sLO https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip -q gradle-8.7-bin.zip
 
-          chmod +x gradlew
-
-          echo "==> Compiling Debug APK..."
-          ./gradlew assembleDebug --stacktrace
+          echo "==> Building APK directly with Gradle..."
+          ./gradle-8.7/bin/gradle assembleDebug --stacktrace
 
       - name: Upload Finished APK
         uses: actions/upload-artifact@v4
