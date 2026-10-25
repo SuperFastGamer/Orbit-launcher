@@ -21,25 +21,48 @@ jobs:
 
       - name: Setup Gradle and Build APK
         run: |
-          # If files were pushed inside a subdirectory, locate and move into it
-          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
-            SUBDIR=$(find . -maxdepth 2 -name "settings.gradle*" -exec dirname {} \;)
-            if [ -n "$SUBDIR" ]; then
-              echo "Moving into project directory: $SUBDIR"
-              cd "$SUBDIR"
-            fi
+          # 1. If project files are inside a nested subfolder, move into it
+          if [ -d "Orbit-launcher" ] && [ -f "Orbit-launcher/build.gradle.kts" ]; then
+            cd Orbit-launcher
           fi
 
-          # Install standalone Gradle 8.7 if wrapper is absent
+          # 2. Automatically generate settings.gradle.kts if missing
+          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
+            echo "==> Creating missing settings.gradle.kts..."
+            cat << 'EOF' > settings.gradle.kts
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = "Orbit-launcher"
+if (file("app").exists()) {
+    include(":app")
+}
+EOF
+          fi
+
+          # 3. Download standalone Gradle 8.7 to create wrapper
           if [ ! -f "./gradlew" ]; then
-            echo "Installing standalone Gradle..."
-            wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip -O gradle-bin.zip
-            unzip -q gradle-bin.zip
+            echo "==> Downloading Gradle 8.7..."
+            curl -sLO https://services.gradle.org/distributions/gradle-8.7-bin.zip
+            unzip -q gradle-8.7-bin.zip
             ./gradle-8.7/bin/gradle wrapper
-            rm -rf gradle-bin.zip gradle-8.7
+            rm -rf gradle-8.7-bin.zip gradle-8.7
           fi
 
           chmod +x gradlew
+
+          # 4. Compile the APK
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload Finished APK
