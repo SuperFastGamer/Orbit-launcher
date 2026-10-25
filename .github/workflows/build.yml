@@ -21,37 +21,22 @@ jobs:
 
       - name: Setup Gradle and Build APK
         run: |
-          # 1. If project files are inside a nested subfolder, move into it
+          set -e
+
+          # Move into subfolder if project files are nested
           if [ -d "Orbit-launcher" ] && [ -f "Orbit-launcher/build.gradle.kts" ]; then
             cd Orbit-launcher
           fi
 
-          # 2. Automatically generate settings.gradle.kts if missing
+          # Auto-create settings.gradle.kts if missing
           if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
-            echo "==> Creating missing settings.gradle.kts..."
-            cat << 'EOF' > settings.gradle.kts
-pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-rootProject.name = "Orbit-launcher"
-if (file("app").exists()) {
-    include(":app")
-}
-EOF
+            echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle.kts
+            echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle.kts
+            echo 'rootProject.name = "Orbit-launcher"' >> settings.gradle.kts
+            echo 'if (file("app").exists()) { include(":app") }' >> settings.gradle.kts
           fi
 
-          # 3. Download standalone Gradle 8.7 to create wrapper
+          # Install standalone Gradle 8.7 if wrapper is absent
           if [ ! -f "./gradlew" ]; then
             echo "==> Downloading Gradle 8.7..."
             curl -sLO https://services.gradle.org/distributions/gradle-8.7-bin.zip
@@ -62,7 +47,7 @@ EOF
 
           chmod +x gradlew
 
-          # 4. Compile the APK
+          echo "==> Compiling Debug APK..."
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload Finished APK
