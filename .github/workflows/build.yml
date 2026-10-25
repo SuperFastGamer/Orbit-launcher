@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK with Capacitor
 
 on:
   workflow_dispatch:
@@ -15,50 +15,43 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "17"
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Setup Gradle and Build APK
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Dependencies & Build Web Assets
         run: |
-          set -e
+          npm install
+          npm run build
 
-          echo "=== 1. Inspecting repository layout ==="
-          ls -la
+      - name: Initialize Capacitor Android
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init Orbit-launcher com.superfastgamer.orbitlauncher --web-dir dist
+          npx cap add android
+          npx cap sync android
 
-          # If code was committed inside a subfolder, enter it
-          if [ -d "Orbit-launcher" ] && [ -f "Orbit-launcher/build.gradle.kts" ]; then
-            echo "Entering subfolder Orbit-launcher..."
-            cd Orbit-launcher
-          fi
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
 
-          echo "=== 2. Downloading standalone Gradle 8.7 ==="
-          if [ ! -d "gradle-8.7" ]; then
-            curl -sLO https://services.gradle.org/distributions/gradle-8.7-bin.zip
-            unzip -q gradle-8.7-bin.zip
-            rm -f gradle-8.7-bin.zip
-          fi
-
-          echo "=== 3. Writing settings.gradle.kts cleanly ==="
-          if [ -d "app" ] && [ -f "app/build.gradle.kts" ]; then
-            echo "Multi-project layout detected."
-            printf 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }\n' > settings.gradle.kts
-            printf 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS); repositories { google(); mavenCentral() } }\n' >> settings.gradle.kts
-            printf 'rootProject.name = "Orbit-launcher"\n' >> settings.gradle.kts
-            printf 'include(":app")\n' >> settings.gradle.kts
-          else
-            echo "Flat single-project layout detected."
-            printf 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }\n' > settings.gradle.kts
-            printf 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS); repositories { google(); mavenCentral() } }\n' >> settings.gradle.kts
-            printf 'rootProject.name = "Orbit-launcher"\n' >> settings.gradle.kts
-          fi
-
-          echo "=== 4. Checking available Gradle tasks ==="
-          ./gradle-8.7/bin/gradle projects
-          ./gradle-8.7/bin/gradle tasks --group="build" || true
-
-          echo "=== 5. Compiling Debug APK ==="
-          ./gradle-8.7/bin/gradle assembleDebug || ./gradle-8.7/bin
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
           
