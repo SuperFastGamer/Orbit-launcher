@@ -3,7 +3,9 @@ name: Build Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - main
+      - master
 
 jobs:
   build:
@@ -16,33 +18,37 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
 
-      - name: Download Gradle and Build APK
+      - name: Setup Gradle and Build
         run: |
           set -e
 
-          # Move into subfolder if project files are nested
-          if [ -d "Orbit-launcher" ] && [ -f "Orbit-launcher/build.gradle.kts" ]; then
-            cd Orbit-launcher
+          # 1. Download standalone Gradle 8.7 if not present
+          if [ ! -d "gradle-8.7" ]; then
+            echo "==> Downloading Gradle 8.7..."
+            curl -sLO https://services.gradle.org/distributions/gradle-8.7-bin.zip
+            unzip -q gradle-8.7-bin.zip
           fi
 
-          # Auto-create settings.gradle.kts if missing
-          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
+          # 2. Safely create settings.gradle.kts using clean echo statements
+          if [ -f "build.gradle.kts" ] && [ ! -d "app" ]; then
+            echo "==> Configuring flat project layout..."
             echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle.kts
-            echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle.kts
+            echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS); repositories { google(); mavenCentral() } }' >> settings.gradle.kts
+            echo 'rootProject.name = "Orbit-launcher"' >> settings.gradle.kts
+          else
+            echo "==> Configuring standard multi-project layout..."
+            echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle.kts
+            echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS); repositories { google(); mavenCentral() } }' >> settings.gradle.kts
             echo 'rootProject.name = "Orbit-launcher"' >> settings.gradle.kts
             echo 'if (file("app").exists()) { include(":app") }' >> settings.gradle.kts
           fi
 
-          # Download and unpack standalone Gradle 8.7
-          echo "==> Downloading Gradle 8.7..."
-          curl -sLO https://services.gradle.org/distributions/gradle-8.7-bin.zip
-          unzip -q gradle-8.7-bin.zip
-
-          echo "==> Building APK directly with Gradle..."
-          ./gradle-8.7/bin/gradle assembleDebug --stacktrace
+          # 3. Compile the APK
+          echo "==> Compiling APK..."
+          ./gradle-8.7/bin/gradle assembleDebug || ./gradle-8.7/bin/gradle :app:assembleDebug --stacktrace
 
       - name: Upload Finished APK
         uses: actions/upload-artifact@v4
