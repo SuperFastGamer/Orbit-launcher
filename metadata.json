@@ -1,0 +1,6 @@
+{
+  "name": "Orbital Launcher",
+  "description": "Ultra-minimalist, fluid, gesture-driven radial Android launcher with spring physics, layered orbital hubs, emergency lockdown, and task focus whitelist.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
